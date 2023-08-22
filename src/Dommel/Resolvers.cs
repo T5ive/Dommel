@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -155,6 +156,54 @@ public static class Resolvers
     public static string Column(PropertyInfo propertyInfo, ISqlBuilder sqlBuilder, bool includeTableName = true)
     {
         var key = $"{sqlBuilder.GetType()}.{propertyInfo.ReflectedType}.{propertyInfo.Name}.{includeTableName}";
+        if (!ColumnNameCache.TryGetValue(key, out var columnName))
+        {
+            columnName = sqlBuilder.QuoteIdentifier(DommelMapper.ColumnNameResolver.ResolveColumnName(propertyInfo));
+            if (includeTableName && propertyInfo.ReflectedType?.IsDefined(typeof(CompilerGeneratedAttribute)) == false)
+            {
+                // Include the table name for unambiguity, except for anonymyes types e.g. x => new { x.Id, x.Name }
+                var tableName = Table(propertyInfo.ReflectedType, sqlBuilder);
+                columnName = $"{tableName}.{columnName}";
+            }
+            ColumnNameCache.TryAdd(key, columnName);
+        }
+
+        DommelMapper.LogReceived?.Invoke($"Resolved column name '{columnName}' for '{propertyInfo}'");
+        return columnName;
+    }
+
+    /// <summary>
+    /// Gets the name of the column in the database for the specified type,
+    /// using the configured <see cref="IColumnNameResolver"/>.
+    /// </summary>
+    /// <param name="expression">The <see cref="MemberExpression"/> to get the column name for.</param>
+    /// <param name="connection">The database connection instance.</param>
+    /// <returns>The column name in the database for <paramref name="expression"/>.</returns>
+    public static string Column(MemberExpression expression, IDbConnection connection)
+        => Column(expression, DommelMapper.GetSqlBuilder(connection));
+
+    /// <summary>
+    /// Gets the name of the column in the database for the specified type,
+    /// using the configured <see cref="IColumnNameResolver"/>.
+    /// </summary>
+    /// <param name="expression">The <see cref="MemberExpression"/> to get the column name for.</param>
+    /// <param name="sqlBuilder">The SQL builder instance.</param>
+    /// <returns>The column name in the database for <paramref name="expression"/>.</returns>
+    public static string Column(MemberExpression expression, ISqlBuilder sqlBuilder)
+        => Column(expression, sqlBuilder, DommelMapper.IncludeTableNameInColumnName);
+
+    /// <summary>
+    /// Gets the name of the column in the database for the specified type,
+    /// using the configured <see cref="IColumnNameResolver"/>.
+    /// </summary>
+    /// <param name="expression">The <see cref="MemberExpression"/> to get the column name for.</param>
+    /// <param name="sqlBuilder">The SQL builder instance.</param>
+    /// <param name="includeTableName">Whether to include table name with the column name for unambiguity. E.g. <c>[Products].[Name]</c>.</param>
+    /// <returns>The column name in the database for <paramref name="expression"/>.</returns>
+    public static string Column(MemberExpression expression, ISqlBuilder sqlBuilder, bool includeTableName = true)
+    {
+        var propertyInfo = (PropertyInfo)expression.Member;
+        var key = $"{sqlBuilder.GetType()}.{expression.Expression.Type}.{propertyInfo.Name}.{includeTableName}";
         if (!ColumnNameCache.TryGetValue(key, out var columnName))
         {
             columnName = sqlBuilder.QuoteIdentifier(DommelMapper.ColumnNameResolver.ResolveColumnName(propertyInfo));

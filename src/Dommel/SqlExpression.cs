@@ -69,7 +69,7 @@ public class SqlExpression<TEntity>
         PropertyInfo[]? props = null;
 
         // Get properties from expression
-        if(selector.NodeType == ExpressionType.Lambda && selector.Body?.NodeType == ExpressionType.New)
+        if (selector.NodeType == ExpressionType.Lambda && selector.Body?.NodeType == ExpressionType.New)
         {
             if (selector.Body is NewExpression newExpression)
             {
@@ -585,7 +585,7 @@ public class SqlExpression<TEntity>
     /// <param name="expression">The member expression.</param>
     /// <returns>The result of the processing.</returns>
     protected virtual string MemberToColumn(MemberExpression expression) =>
-        Resolvers.Column((PropertyInfo)expression.Member, SqlBuilder);
+        Resolvers.Column(expression, SqlBuilder);
 
     /// <summary>
     /// Returns the expression operant for the specified expression type.
