@@ -207,10 +207,10 @@ public static class Resolvers
         if (!ColumnNameCache.TryGetValue(key, out var columnName))
         {
             columnName = sqlBuilder.QuoteIdentifier(DommelMapper.ColumnNameResolver.ResolveColumnName(propertyInfo));
-            if (includeTableName && propertyInfo.ReflectedType?.IsDefined(typeof(CompilerGeneratedAttribute)) == false)
+            if (includeTableName && expression.Expression.Type?.IsDefined(typeof(CompilerGeneratedAttribute)) == false)
             {
                 // Include the table name for unambiguity, except for anonymyes types e.g. x => new { x.Id, x.Name }
-                var tableName = Table(propertyInfo.ReflectedType, sqlBuilder);
+                var tableName = Table(expression.Expression.Type, sqlBuilder);
                 columnName = $"{tableName}.{columnName}";
             }
             ColumnNameCache.TryAdd(key, columnName);
