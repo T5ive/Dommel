@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net7.0</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <Description>Simple CRUD operations for Dapper.</Description>
     <PackageTags>dommel;crud;dapper;database;orm</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
