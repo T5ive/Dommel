@@ -73,10 +73,10 @@ public class SqlExpression<TEntity>
         {
             if (selector.Body is NewExpression newExpression)
             {
-                props = newExpression.Arguments
-                    .Select(x => (x as MemberExpression)?.Member)
-                    .Where(x => x != null)
-                    .Cast<PropertyInfo>()
+                props = newExpression
+                    .Arguments
+                    .OfType<MemberExpression>()
+                    .Select(x => x.Expression?.Type.GetProperty(x.Member.Name)!)
                     .ToArray();
             }
         }
@@ -174,8 +174,11 @@ public class SqlExpression<TEntity>
         {
             _whereBuilder.AppendFormat(" {0} ", conditionOperator);
         }
-
-        _whereBuilder.Append("(" + sqlExpression + ")");
+        if (conditionOperator != null)
+        {
+            sqlExpression = $"({sqlExpression})";
+        }
+        _whereBuilder.Append(sqlExpression);
     }
 
     /// <summary>
@@ -449,6 +452,8 @@ public class SqlExpression<TEntity>
         return VisitExpression(epxression.Body);
     }
 
+    private static bool IsAndOr(ExpressionType expressionType) => expressionType is ExpressionType.AndAlso or ExpressionType.OrElse;
+
     /// <summary>
     /// Processes a binary expression.
     /// </summary>
@@ -458,12 +463,12 @@ public class SqlExpression<TEntity>
     {
         object left, right;
         var operand = GetOperant(expression.NodeType);
-        if (operand == "and" || operand == "or")
+        if (IsAndOr(expression.NodeType))
         {
             // Process left and right side of the "and/or" expression, e.g.:
             // Foo == 42    or      Bar == 42
             //   left    operand     right
-            //
+
             if (expression.Left is MemberExpression leftMember && leftMember.Expression?.NodeType == ExpressionType.Parameter)
             {
                 left = $"{VisitMemberAccess(leftMember)} = '1'";
@@ -471,6 +476,11 @@ public class SqlExpression<TEntity>
             else
             {
                 left = VisitExpression(expression.Left);
+                if (IsAndOr(expression.Left.NodeType) && expression.Left.NodeType != expression.NodeType)
+                {
+                    // Wrap left expression in parentheses when that side is an and/or expression and the current expression is the opposite
+                    left = $"({left})";
+                }
             }
 
             if (expression.Right is MemberExpression rightMember && rightMember.Expression?.NodeType == ExpressionType.Parameter)
@@ -480,7 +490,14 @@ public class SqlExpression<TEntity>
             else
             {
                 right = VisitExpression(expression.Right);
+                if (IsAndOr(expression.Right.NodeType) && expression.Right.NodeType != expression.NodeType)
+                {
+                    // Wrap right expression in parentheses when that side is an and/or expression and the current expression is the opposite
+                    right = $"({right})";
+                }
             }
+
+            return $"{left} {operand} {right}";
         }
         else
         {
@@ -504,8 +521,6 @@ public class SqlExpression<TEntity>
             AddParameter(right, out var paramName);
             return $"{left} {operand} {paramName}";
         }
-
-        return $"{left} {operand} {right}";
     }
 
     /// <summary>
@@ -580,12 +595,12 @@ public class SqlExpression<TEntity>
     protected virtual object VisitConstantExpression(ConstantExpression expression) => expression.Value!;
 
     /// <summary>
-    /// Proccesses a member expression.
+    /// Processes a member expression.
     /// </summary>
     /// <param name="expression">The member expression.</param>
     /// <returns>The result of the processing.</returns>
     protected virtual string MemberToColumn(MemberExpression expression) =>
-        Resolvers.Column(expression, SqlBuilder);
+        Resolvers.Column(expression.Expression!.Type.GetProperty(expression.Member.Name)!, SqlBuilder);
 
     /// <summary>
     /// Returns the expression operant for the specified expression type.
