@@ -600,7 +600,7 @@ public class SqlExpression<TEntity>
     /// <param name="expression">The member expression.</param>
     /// <returns>The result of the processing.</returns>
     protected virtual string MemberToColumn(MemberExpression expression) =>
-        Resolvers.Column(expression.Expression!.Type.GetProperty(expression.Member.Name)!, SqlBuilder);
+        Resolvers.Column(expression, SqlBuilder);
 
     /// <summary>
     /// Returns the expression operant for the specified expression type.
